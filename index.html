@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deadline Manager</title>
+  <meta name="theme-color" content="#f5f4ef" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div>
+        <div class="eyebrow" id="syncStatus">未登入</div>
+        <h1>Deadline Manager</h1>
+      </div>
+      <div class="hero-actions">
+        <button class="icon-btn" id="btnSettings" title="設定">⚙</button>
+        <button class="icon-btn primary" id="btnAdd">＋</button>
+      </div>
+    </header>
+
+    <section class="summary-grid" id="summaryGrid"></section>
+
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span>⌕</span>
+        <input id="searchInput" placeholder="搜尋任務、品牌、專案、備註" />
+      </div>
+      <button class="filter-toggle" id="btnFilters">篩選</button>
+    </div>
+
+    <section class="filter-panel" id="filterPanel" hidden>
+      <div class="filter-block">
+        <div class="filter-title">分類</div>
+        <div class="chip-row" id="categoryFilters"></div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-title">品牌</div>
+        <div class="chip-row" id="brandFilters"></div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-title">專案</div>
+        <div class="chip-row" id="projectFilters"></div>
+      </div>
+      <button class="link-btn" id="clearFilters">清除所有篩選</button>
+    </section>
+
+    <main class="task-area">
+      <div class="section-head">
+        <h2>最近截止</h2>
+        <button class="link-btn" id="toggleDone">顯示已完成</button>
+      </div>
+      <div id="taskList" class="task-list"></div>
+    </main>
+  </div>
+
+  <div class="auth-card" id="authCard">
+    <div class="auth-panel">
+      <h2>登入後同步資料</h2>
+      <p>使用 Google 登入後，手機、電腦、公司與家裡會共用同一份 Deadline Manager 資料。</p>
+      <button class="btn dark" id="btnGoogle">使用 Google 登入</button>
+      <button class="btn ghost" id="btnLocalOnly">先用本機模式</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden></div>
+
+  <section class="modal sheet" id="taskModal" hidden>
+    <div class="modal-head">
+      <h3 id="taskModalTitle">新增任務</h3>
+      <button class="icon-btn" data-close>×</button>
+    </div>
+    <div class="form-grid">
+      <label>任務名稱<input id="taskTitle" placeholder="例：FB IG貼文" /></label>
+      <label>品牌<select id="taskBrand"></select></label>
+      <label>專案<select id="taskProject"></select></label>
+      <label>分類<select id="taskCategory"></select></label>
+      <label>截止日期<input type="date" id="taskDate" /></label>
+      <label>截止時間<input type="time" id="taskTime" /></label>
+      <label class="full">備註<textarea id="taskNotes" rows="3" placeholder="補充說明"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close>取消</button>
+      <button class="btn dark" id="saveTask">儲存</button>
+    </div>
+  </section>
+
+  <section class="modal sheet" id="settingsModal" hidden>
+    <div class="modal-head">
+      <h3>設定</h3>
+      <button class="icon-btn" data-close>×</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="brands">品牌</button>
+      <button class="tab" data-tab="projects">專案</button>
+      <button class="tab" data-tab="categories">分類</button>
+      <button class="tab" data-tab="backup">備份</button>
+    </div>
+    <div id="settingsBody"></div>
+  </section>
+
+  <div class="popover" id="popover" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
