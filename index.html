@@ -47,13 +47,18 @@ button{cursor:pointer}
 .manage-list{display:flex;flex-direction:column;gap:9px}.manage-item{display:grid;grid-template-columns:38px 1fr 94px 36px;gap:8px;align-items:center;background:#F8F8F5;border:1px solid var(--line);border-radius:20px;padding:8px}.swatch{width:30px;height:30px;border-radius:50%;border:0;background:var(--swatch);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}.mini-input{border:0!important;background:#fff!important;border-radius:14px!important;padding:10px!important;font-size:13px!important}.archive-toggle{border:0;background:#fff;border-radius:14px;height:36px;font-size:11px;font-weight:900;color:var(--muted)}.icon-btn{border:0;background:#fff;border-radius:14px;width:36px;height:36px;font-weight:900}.settings-grid{display:grid;gap:10px}.setting-card{border:1px solid var(--line);background:#F8F8F5;border-radius:22px;padding:15px}.setting-card h3{margin:0 0 5px;font-size:15px;font-weight:900}.setting-card p{margin:0 0 12px;color:var(--muted);font-size:12px;font-weight:700;line-height:1.5}.hidden{display:none!important}
 @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}@keyframes sheet{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}@keyframes fadeUp{from{transform:translateY(6px);opacity:0}to{transform:translateY(0);opacity:1}}
 @media (max-width:380px){.app{padding-left:14px;padding-right:14px}.hero-grid{gap:8px}.metric{padding:12px 10px}.metric strong{font-size:26px}.card .main{gap:12px}.deadline-block{min-width:66px}.deadline-date{font-size:25px}.row2{grid-template-columns:1fr}.manage-item{grid-template-columns:34px 1fr 74px 32px}}
+
+.sync-hint{font-size:11px;font-weight:900;color:var(--muted);margin-top:3px}
+.round-btn.auth{font-family:'Inter',sans-serif;font-size:12px;font-weight:900}
+.setting-card .sync-state{font-size:12px;font-weight:900;color:var(--soft-ink);margin-top:8px}
+
 </style>
 </head>
 <body>
 <div class="app">
   <div class="topbar">
-    <div class="profile"><div class="avatar">D</div><div class="titleblock"><div class="eyebrow">Deadline</div><h1>Today</h1></div></div>
-    <div class="actions"><button class="round-btn" id="openSettings" title="設定">⌘</button><button class="round-btn dark" id="quickAdd" title="新增">＋</button></div>
+    <div class="profile"><div class="avatar" id="userAvatar">D</div><div class="titleblock"><div class="eyebrow">Deadline</div><h1>Today</h1><div class="sync-hint" id="syncStatus">本機模式</div></div></div>
+    <div class="actions"><button class="round-btn auth" id="authBtn" title="Google 登入">G</button><button class="round-btn" id="openSettings" title="設定">⌘</button><button class="round-btn dark" id="quickAdd" title="新增">＋</button></div>
   </div>
 
   <section class="hero">
@@ -98,6 +103,7 @@ button{cursor:pointer}
 <div class="overlay" id="settingsOverlay"><div class="sheet">
   <div class="sheet-head"><h2>設定</h2><button class="xbtn" data-close="settingsOverlay">✕</button></div>
   <div class="settings-grid">
+    <div class="setting-card"><h3>同步狀態</h3><p>登入 Google 後，電腦與手機會共用同一份資料。未登入時會使用本機資料。</p><button class="btn primary" id="settingsAuthBtn">使用 Google 登入</button><div class="sync-state" id="settingsSyncState">目前：本機模式</div></div>
     <div class="setting-card"><h3>分類管理</h3><p>分類控制卡片左色條與淡背景。</p><button class="btn primary" id="manageCategories">管理分類</button></div>
     <div class="setting-card"><h3>品牌管理</h3><p>品牌會以標籤並列顯示在任務卡片上。</p><button class="btn primary" id="manageBrands">管理品牌</button></div>
     <div class="setting-card"><h3>專案管理</h3><p>專案需綁定品牌，可封存但保留歷史。</p><button class="btn primary" id="manageProjects">管理專案</button></div>
@@ -111,7 +117,31 @@ button{cursor:pointer}
   <div class="btnrow"><button class="btn ghost" id="addManageRow">＋ 新增</button><button class="btn primary" id="saveManage">儲存</button></div>
 </div></div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+import { getFirestore, doc, onSnapshot, setDoc, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBZvOpI8ifitJOKTNyyG4oEg6NvK9rlI4g",
+  authDomain: "deadline-manager-352b8.firebaseapp.com",
+  projectId: "deadline-manager-352b8",
+  storageBucket: "deadline-manager-352b8.firebasestorage.app",
+  messagingSenderId: "268211531538",
+  appId: "1:268211531538:web:57024b80637f63e6f20dcb"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const provider = new GoogleAuthProvider();
+const db = getFirestore(firebaseApp);
+try{ enableIndexedDbPersistence(db).catch(()=>{}); }catch(e){}
+
+let currentUser = null;
+let cloudReady = false;
+let unsubscribeCloud = null;
+let saveTimer = null;
+let isApplyingRemote = false;
 const STORAGE_KEY='deadline-manager-v7';
 const COLORS=['#D8E986','#AAA0E7','#B9D8F8','#F2C38B','#BDE6D6','#F5B8B2','#D7D9E2','#F0D98A'];
 const WEEKDAY=['日','一','二','三','四','五','六'];
@@ -132,7 +162,71 @@ function dayDiff(dateStr){return Math.round((dateOnly(new Date(dateStr))-dateOnl
 function getById(arr,id){return arr.find(x=>x.id===id)}
 function activeItems(arr){return arr.filter(x=>!x.archived)}
 function storageGet(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'null')}catch(e){return null}}
-function storageSet(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function storageSet(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  if(!isApplyingRemote) scheduleCloudSave();
+}
+function userDocRef(){
+  return currentUser ? doc(db,'users',currentUser.uid,'app','state') : null;
+}
+function updateAuthUI(){
+  const logged=!!currentUser;
+  $('#syncStatus').textContent = logged ? `已同步｜${currentUser.displayName||currentUser.email||'Google'}` : '本機模式｜未同步';
+  $('#userAvatar').textContent = logged ? ((currentUser.displayName||currentUser.email||'G').trim()[0]||'G').toUpperCase() : 'D';
+  $('#authBtn').textContent = logged ? '✓' : 'G';
+  $('#authBtn').title = logged ? '已登入，點擊登出' : '使用 Google 登入';
+  const sb=$('#settingsAuthBtn'); if(sb) sb.textContent = logged ? '登出 Google' : '使用 Google 登入';
+  const ss=$('#settingsSyncState'); if(ss) ss.textContent = logged ? `目前：已同步到 ${currentUser.email||'Google 帳號'}` : '目前：本機模式';
+}
+async function loginOrLogout(){
+  try{
+    if(currentUser){ await signOut(auth); return; }
+    await signInWithPopup(auth, provider);
+  }catch(err){
+    console.error(err);
+    alert('Google 登入失敗。請確認 Firebase Authentication 已啟用 Google，且 Authorized domains 已加入你的 GitHub Pages 網域。');
+  }
+}
+function scheduleCloudSave(){
+  if(!currentUser || !cloudReady) return;
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(saveCloud,650);
+}
+async function saveCloud(){
+  if(!currentUser) return;
+  const ref=userDocRef();
+  try{
+    await setDoc(ref,{state, version: state.version||2, updatedAt: Date.now()},{merge:true});
+    $('#syncStatus').textContent = `已同步｜${currentUser.displayName||currentUser.email||'Google'}`;
+  }catch(err){
+    console.error(err);
+    $('#syncStatus').textContent = '同步失敗｜使用本機暫存';
+  }
+}
+function startCloudSync(user){
+  if(unsubscribeCloud){ unsubscribeCloud(); unsubscribeCloud=null; }
+  currentUser=user;
+  updateAuthUI();
+  if(!user){ cloudReady=false; return; }
+  const ref=userDocRef();
+  unsubscribeCloud=onSnapshot(ref, async snap=>{
+    if(snap.exists() && snap.data().state){
+      isApplyingRemote=true;
+      state=migrate(snap.data().state);
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+      renderAll();
+      isApplyingRemote=false;
+      cloudReady=true;
+    }else{
+      cloudReady=true;
+      await saveCloud();
+    }
+  },err=>{
+    console.error(err);
+    $('#syncStatus').textContent='同步連線失敗';
+  });
+}
+onAuthStateChanged(auth,startCloudSync);
 function defaultState(){
   const c1={id:uid('cat'),name:'設計',color:'#AAA0E7'};const c2={id:uid('cat'),name:'社群',color:'#B9D8F8'};const c3={id:uid('cat'),name:'活動',color:'#F2C38B'};const c4={id:uid('cat'),name:'印刷',color:'#BDE6D6'};const c5={id:uid('cat'),name:'公告',color:'#D8E986'};
   const b1={id:uid('brand'),name:'健身工廠',color:'#B9D8F8'};const b2={id:uid('brand'),name:'FORCE',color:'#D8E986'};const b3={id:uid('brand'),name:'商城',color:'#F2C38B'};
@@ -242,6 +336,8 @@ $('#saveManage').addEventListener('click',()=>{const rows=$$('#manageList .manag
   const removed=oldIds.filter(id=>!next.some(x=>x.id===id));if(manageMode==='categories'){removed.forEach(id=>state.tasks.forEach(t=>{if(t.categoryId===id)t.categoryId=''}));state.categories=next}if(manageMode==='brands'){removed.forEach(id=>{state.tasks.forEach(t=>{if(t.brandId===id)t.brandId=''});state.projects.forEach(p=>{if(p.brandId===id)p.brandId=''})});state.brands=next}if(manageMode==='projects'){removed.forEach(id=>state.tasks.forEach(t=>{if(t.projectId===id)t.projectId=''}));state.projects=next}closeOverlay('manageOverlay');renderAll()});
 
 $('#exportJson').addEventListener('click',()=>{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='deadline-manager-backup.json';a.click();URL.revokeObjectURL(a.href)});$('#importJson').addEventListener('click',()=>$('#importFile').click());$('#importFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);if(!confirm('匯入會覆蓋目前資料，確定繼續？'))return;state=migrate(data);renderAll();closeOverlay('settingsOverlay')}catch(err){alert('JSON 檔案格式錯誤')}};reader.readAsText(f)});
+$('#authBtn').addEventListener('click',loginOrLogout);
+$('#settingsAuthBtn').addEventListener('click',loginOrLogout);
 init();
 </script>
 </body>
